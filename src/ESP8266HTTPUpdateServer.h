@@ -10,7 +10,8 @@ class ESP8266HTTPUpdateServer
     ESP8266WebServer *_server;
     static const char *_serverIndex;
     static const char *_failedResponse;
-    static const char *_successResponse;
+    static const char *_fwSuccessResponse;
+    static const char *_spiffsSuccessResponse;
     char * _username;
     char * _password;
     bool _authenticated;

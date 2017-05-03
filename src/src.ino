@@ -34,7 +34,7 @@
 #include <ArduinoOTA.h>               // local OTA update from Arduino IDE
 #include <ESP8266mDNS.h>              // Resolve URL for update server etc.
 #include <ESP8266httpUpdate.h>        // remote OTA update from server
-#include <ESP8266HTTPUpdateServer.h>  // upload update
+#include "ESP8266HTTPUpdateServer.h"  // upload update (local copy)
 #include <DNSServer.h>                // Required for captive portal
 #include <PubSubClient.h>             // MQTT https://github.com/knolleary/pubsubclient PlatformIO lib: 89
 

@@ -6,14 +6,25 @@
 #include "ESP8266HTTPUpdateServer.h"
 
 
+extern "C" uint32_t _SPIFFS_start;
+extern "C" uint32_t _SPIFFS_end;
+
 const char* ESP8266HTTPUpdateServer::_serverIndex =
-R"(<html><body><form method='POST' action='' enctype='multipart/form-data'>
-                  <input type='file' name='update'>
-                  <input type='submit' value='Update'>
+R"(<html><body>
+<form method='POST' action='' enctype='multipart/form-data'>
+Firmware:
+                  <input type='file' name='firmware'>
+                  <input type='submit' name='firmware' value='Update'>
+               </form>
+<form method='POST' action='' enctype='multipart/form-data'>
+Spiffs:
+                  <input type='file' name='spiffs'>
+                  <input type='submit' name='spiffs' value='Update'>
                </form>
          </body></html>)";
 const char* ESP8266HTTPUpdateServer::_failedResponse = R"(Update Failed!)";
-const char* ESP8266HTTPUpdateServer::_successResponse = "<META http-equiv=\"refresh\" content=\"15;URL=\">Update Success! Rebooting...";
+const char* ESP8266HTTPUpdateServer::_fwSuccessResponse = "<META http-equiv=\"refresh\" content=\"15;URL=\">Update Success! Rebooting...";
+const char* ESP8266HTTPUpdateServer::_spiffsSuccessResponse = "<META http-equiv=\"refresh\" content=\"5;URL=\">Update Success! Refreshing...";
 
 ESP8266HTTPUpdateServer::ESP8266HTTPUpdateServer(bool serial_debug)
 {
@@ -41,8 +52,14 @@ void ESP8266HTTPUpdateServer::setup(ESP8266WebServer *server, const char * path,
     _server->on(path, HTTP_POST, [&](){
       if(!_authenticated)
         return _server->requestAuthentication();
-      _server->send(200, "text/html", Update.hasError() ? _failedResponse : _successResponse);
-      ESP.restart();
+      if (Update.hasError())
+        _server->send(200, "text/html", _failedResponse);
+      else if (_server->hasArg("firmware")) {
+        _server->send(200, "text/html", _fwSuccessResponse);
+        ESP.restart();
+      } else {
+        _server->send(200, "text/html", _spiffsSuccessResponse);
+      }
     },[&](){
       // handler for the file upload, get's the sketch bytes, and writes
       // them through the Update object
@@ -61,9 +78,16 @@ void ESP8266HTTPUpdateServer::setup(ESP8266WebServer *server, const char * path,
         WiFiUDP::stopAll();
         if (_serial_output)
           Serial.printf("Update: %s\n", upload.filename.c_str());
-        uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-        if(!Update.begin(maxSketchSpace)){//start with max available size
-          if (_serial_output) Update.printError(Serial);
+        if (upload.name == "spiffs") {
+          size_t spiffsSize = ((size_t) &_SPIFFS_end - (size_t) &_SPIFFS_start);
+          if(!Update.begin(spiffsSize, U_SPIFFS)){//start with max available size
+            if (_serial_output) Update.printError(Serial);
+          }
+        } else { // firmware"
+          uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+          if(!Update.begin(maxSketchSpace)){//start with max available size
+            if (_serial_output) Update.printError(Serial);
+          }
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE){
         if (_serial_output) Serial.printf(".");

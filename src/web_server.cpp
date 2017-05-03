@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>         // Config portal
-#include <ESP8266HTTPUpdateServer.h>  // upload update
+#include "ESP8266HTTPUpdateServer.h"  // upload update (local copy)
 #include <FS.h>                       // SPIFFS file-system: store web server html, CSS etc.
 
 #include "emonesp.h"
