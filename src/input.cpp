@@ -11,10 +11,7 @@ int espflash = 0;
 int espfree = 0;
 
 int commDelay = 60;
-int rapi_command = 1;
 int rapi_command_sent = 0;
-int comm_Delay = 1000;          //Delay between each command and read or write
-unsigned long comm_Timer = 0;   //Timer for Comm requests
 
 String amp = "-";                    //OpenEVSE Current Sensor
 String volt = "-";                   //Not currently in used
@@ -130,6 +127,8 @@ void rapi_parse(String& val1, String& val2, String& val3)
       if (thirdRapiCmd > 0)
         val3 = rapiResponse.substring(thirdRapiCmd + 1);
     }
+
+    return; // Ok, this one is parsed.
   }
 }
 
@@ -143,26 +142,37 @@ void rapi_parse(String& val1, String& val2, String& val3)
 // down the UI.
 // -------------------------------------------------------------------
 
+// If rapi_command_sent == 0, send all commands
+// If rapi_command_sent == 1, parse all results
+
 void
 update_rapi_values() {
-  if ((millis() - comm_Timer) >= comm_Delay) {
-    if (rapi_command_sent == 0) {
-      Serial.flush(); // wait for output buffer
+
+    if (rapi_command_sent == 1) { // now parsing
+      Serial.flush();             // wait for output buffer to empty
+    } else {                      // rapi_command_sent == 0, now sending
+      while (Serial.available())
+        Serial.read();           // consume any prior input
     }
 
-    if (rapi_command_sent == 0 && rapi_command == 1) {
+    if (rapi_command_sent == 0) {
       espfree = ESP.getFreeHeap();
-      rapi_send("$GE*B0");
-    }
-    if (rapi_command_sent == 1 && rapi_command == 1) {
-      rapi_parse(pilot, unused, unused);
-    }
-    if (rapi_command_sent == 0 && rapi_command == 2) {
-      rapi_send("$GS*BE");
-    }
-    if (rapi_command_sent == 1 && rapi_command == 2) {
+      rapi_send("$GE*B0");  // settings, amps: pilot
+      rapi_send("$GS*BE");  // state, time: state
+      rapi_send("$GG*B2");  // current, voltage: amp, volt
+      rapi_send("$GP*BB");  // temps: temp1, temp2, temp3
+      rapi_send("$GU*C0");  // energy usage: wattsec, watthour_total
+      rapi_send("$GF*B1");  // Faults: gfci_count, nognd_count, stuck_count
+    } else if (rapi_command_sent == 1) {
       String state_s;
+
+      rapi_parse(pilot, unused, unused);
       rapi_parse(state_s, unused, unused);
+      rapi_parse(amp, volt, unused);
+      rapi_parse(temp1, temp2, temp3);
+      rapi_parse(wattsec, watthour_total, unused);
+      rapi_parse(gfci_count, nognd_count, stuck_count);
+
       state = strtol(state_s.c_str(), NULL, 16);
       if (state == 1)   estate = "Not_Connected";
       if (state == 2)   estate = "EV_Connected";
@@ -177,44 +187,20 @@ update_rapi_values() {
       if (state == 254) estate = "Sleeping";
       if (state == 255) estate = "Disabled";
     }
-    if (rapi_command_sent == 0 && rapi_command == 3) {
-      rapi_send("$GG*B2");
-    }
-    if (rapi_command_sent == 1 && rapi_command == 3) {
-      rapi_parse(amp, volt, unused);
-    }
-    if (rapi_command_sent == 0 && rapi_command == 4) {
-      rapi_send("$GP*BB");
-    }
-    if (rapi_command_sent == 1 && rapi_command == 4) {
-      rapi_parse(temp1, temp2, temp3);
-    }
-    if (rapi_command_sent == 0 && rapi_command == 5) {
-      rapi_send("$GU*C0");
-    }
-    if (rapi_command_sent == 1 && rapi_command == 5) {
-      rapi_parse(wattsec, watthour_total, unused);
-    }
-    if (rapi_command_sent == 0 && rapi_command == 6) {
-      rapi_send("$GF*B1");
-    }
-    if (rapi_command_sent == 1 && rapi_command == 6) {
-      rapi_parse(gfci_count, nognd_count, stuck_count);
-      rapi_command = 0;         //Last RAPI command
-    }
+
     if (rapi_command_sent == 0) {
       rapi_command_sent = 1;
-    } else {
-      rapi_command++;
+    } else { // rapi_commend_ssent == 1
       rapi_command_sent = 0;
     }
-    comm_Timer = millis();
-  }
 }
 
 void
 handleRapiRead() {
   Serial.flush(); // Flush output buffer
+  // Consume leftover input buffer
+  while(Serial.available())
+    Serial.read();
   rapi_send("$GV*C1");
   delay(commDelay);
   rapi_parse(firmware, protocol, unused);

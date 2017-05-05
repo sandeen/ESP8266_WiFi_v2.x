@@ -93,9 +93,9 @@ loop() {
 
   if (wifi_mode == WIFI_MODE_STA || wifi_mode == WIFI_MODE_AP_AND_STA) {
 // -------------------------------------------------------------------
-// Do these things once every 5s
+// Do these things once every 1s
 // -------------------------------------------------------------------
-    if ((millis() - Timer3) >= 5000) {
+    if ((millis() - Timer3) >= 1000) {
       update_rapi_values();
       Timer3 = millis();
     }

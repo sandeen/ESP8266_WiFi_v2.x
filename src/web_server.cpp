@@ -459,7 +459,7 @@ handleRapiR() {
   String rapi = server.arg("rapi");
   rapi.replace("%24", "$");
   rapi.replace("+", " ");
-  Serial.flush();
+  Serial.flush();	// Wait for output buffer to clear (why?)
   Serial.println(rapi);
   delay(commDelay);
   while (Serial.available()) {
