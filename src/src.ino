@@ -75,7 +75,8 @@ setup() {
   web_server_setup();
   delay(5000);                  //gives OpenEVSE time to finish self test on cold start
   handleRapiRead();             //Read all RAPI values
-  // ota_setup();
+  ArduinoOTA.onError([](ota_error_t error) { ESP.restart(); });
+  ArduinoOTA.begin();
 
 }                               // end setup
 
@@ -84,7 +85,7 @@ setup() {
 // -------------------------------------------------------------------
 void
 loop() {
-  // ota_loop();
+  ArduinoOTA.handle();
   web_server_loop();
   wifi_loop();
   if (mqtt_server != 0)
