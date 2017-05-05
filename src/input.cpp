@@ -16,12 +16,12 @@ int rapi_command_sent = 0;
 int comm_Delay = 1000;          //Delay between each command and read or write
 unsigned long comm_Timer = 0;   //Timer for Comm requests
 
-int amp = 0;                    //OpenEVSE Current Sensor
-int volt = 0;                   //Not currently in used
-int temp1 = 0;                  //Sensor DS3232 Ambient
-int temp2 = 0;                  //Sensor MCP9808 Ambient
-int temp3 = 0;                  //Sensor TMP007 Infared
-int pilot = 0;                  //OpenEVSE Pilot Setting
+String amp = "-";                    //OpenEVSE Current Sensor
+String volt = "-";                   //Not currently in used
+String temp1 = "-";                  //Sensor DS3232 Ambient
+String temp2 = "-";                  //Sensor MCP9808 Ambient
+String temp3 = "-";                  //Sensor TMP007 Infared
+String pilot = "-";                  //OpenEVSE Pilot Setting
 long state = 0;                 //OpenEVSE State
 String estate = "Unknown";      // Common name for State
 
@@ -70,11 +70,11 @@ create_rapi_json() {
   url = e_url;
   data = "";
   url += String(emoncms_node) + "&json={";
-  data += "amp:" + String(amp) + ",";
-  data += "temp1:" + String(temp1) + ",";
-  data += "temp2:" + String(temp2) + ",";
-  data += "temp3:" + String(temp3) + ",";
-  data += "pilot:" + String(pilot) + ",";
+  data += "amp:" + amp + ",";
+  data += "temp1:" + temp1 + ",";
+  data += "temp2:" + temp2 + ",";
+  data += "temp3:" + temp3 + ",";
+  data += "pilot:" + pilot + ",";
   data += "state:" + String(state);
   url += data;
   if (emoncms_server == "data.openevse.com/emoncms") {
@@ -111,9 +111,7 @@ update_rapi_values() {
         String rapiString = Serial.readStringUntil('\r');
         if (rapiString.startsWith("$OK ")) {
           comm_success++;
-          String qrapi;
-          qrapi = rapiString.substring(rapiString.indexOf(' '));
-          pilot = qrapi.toInt();
+          pilot = rapiString.substring(rapiString.indexOf(' '));
         }
       }
     }
@@ -174,12 +172,8 @@ update_rapi_values() {
         String rapiString = Serial.readStringUntil('\r');
         if (rapiString.startsWith("$OK")) {
           comm_success++;
-          String qrapi;
-          qrapi = rapiString.substring(rapiString.indexOf(' '));
-          amp = qrapi.toInt();
-          String qrapi1;
-          qrapi1 = rapiString.substring(rapiString.lastIndexOf(' '));
-          volt = qrapi1.toInt();
+          amp = rapiString.substring(rapiString.indexOf(' '));
+          volt = rapiString.substring(rapiString.lastIndexOf(' '));
         }
       }
     }
@@ -191,16 +185,10 @@ update_rapi_values() {
         String rapiString = Serial.readStringUntil('\r');
         if (rapiString.startsWith("$OK")) {
           comm_success++;
-          String qrapi;
-          qrapi = rapiString.substring(rapiString.indexOf(' '));
-          temp1 = qrapi.toInt();
-          String qrapi1;
+          temp1 = rapiString.substring(rapiString.indexOf(' '));
           int firstRapiCmd = rapiString.indexOf(' ');
-          qrapi1 = rapiString.substring(rapiString.indexOf(' ', firstRapiCmd + 1));
-          temp2 = qrapi1.toInt();
-          String qrapi2;
-          qrapi2 = rapiString.substring(rapiString.lastIndexOf(' '));
-          temp3 = qrapi2.toInt();
+          temp2 = rapiString.substring(rapiString.indexOf(' ', firstRapiCmd + 1));
+          temp3 = rapiString.substring(rapiString.lastIndexOf(' '));
         }
       }
     }
@@ -306,9 +294,7 @@ handleRapiRead() {
     String rapiString = Serial.readStringUntil('\r');
     if (rapiString.startsWith("$OK ")) {
       comm_success++;
-      String qrapi;
-      qrapi = rapiString.substring(rapiString.indexOf(' '));
-      pilot = qrapi.toInt();
+      pilot = rapiString.substring(rapiString.indexOf(' '));
       String flag = rapiString.substring(rapiString.lastIndexOf(' '));
       long flags = strtol(flag.c_str(), NULL, 16);
       service = bitRead(flags, 0) + 1;
