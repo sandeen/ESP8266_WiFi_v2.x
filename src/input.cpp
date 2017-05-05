@@ -88,146 +88,122 @@ create_rapi_json() {
   //DEBUG.print(emoncms_server.c_str() + String(url));
 }
 
+// Send RAPI command & increment stats
+void rapi_send(String cmd)
+{
+  Serial.println(cmd);
+  comm_sent++;
+}
+
+String unused;
+
+// Parse RAPI response into val1, val2, val3
+// as appropriate.  Pass string 'unused' for vals to ignore
+// increment stats on success
+void rapi_parse(String& val1, String& val2, String& val3)
+{
+  while (Serial.available()) {
+    String rapiResponse = Serial.readStringUntil('\r');
+    if (rapiResponse.startsWith("$OK")) {
+      comm_success++;
+
+      // Strip out checksum char & checksum val for now (check later)
+      int checkSumChar = rapiResponse.indexOf('^');
+      if (checkSumChar > 0) {
+        rapiResponse.remove(checkSumChar);
+      }
+
+      int firstRapiCmd = 0, secondRapiCmd = 0, thirdRapiCmd = 0;
+
+      firstRapiCmd = rapiResponse.indexOf(' ');
+
+      if (firstRapiCmd > 0) {
+        secondRapiCmd = rapiResponse.indexOf(' ', firstRapiCmd + 1); // pos or -1
+        val1 = rapiResponse.substring(firstRapiCmd + 1, secondRapiCmd);
+      }
+
+      if (secondRapiCmd > 0) {
+        thirdRapiCmd = rapiResponse.indexOf(' ', secondRapiCmd + 1); // pos or -1
+        val2 = rapiResponse.substring(secondRapiCmd + 1, thirdRapiCmd);
+      }
+
+      if (thirdRapiCmd > 0)
+        val3 = rapiResponse.substring(thirdRapiCmd + 1);
+    }
+  }
+}
+
 // -------------------------------------------------------------------
 // OpenEVSE Request
 //
 // Get RAPI Values
 // Runs from arduino main loop, runs a new command in the loop
 // on each call.  Used for values that change at runtime.
+// Complex state is to avoid waiting for serial response and bogging
+// down the UI.
 // -------------------------------------------------------------------
 
 void
 update_rapi_values() {
   if ((millis() - comm_Timer) >= comm_Delay) {
     if (rapi_command_sent == 0) {
-      Serial.flush();
+      Serial.flush(); // wait for output buffer
     }
+
     if (rapi_command_sent == 0 && rapi_command == 1) {
       espfree = ESP.getFreeHeap();
-      Serial.println("$GE*B0");
+      rapi_send("$GE*B0");
     }
     if (rapi_command_sent == 1 && rapi_command == 1) {
-      while (Serial.available()) {
-        String rapiString = Serial.readStringUntil('\r');
-        if (rapiString.startsWith("$OK ")) {
-          comm_success++;
-          pilot = rapiString.substring(rapiString.indexOf(' '));
-        }
-      }
+      rapi_parse(pilot, unused, unused);
     }
     if (rapi_command_sent == 0 && rapi_command == 2) {
-      Serial.println("$GS*BE");
+      rapi_send("$GS*BE");
     }
     if (rapi_command_sent == 1 && rapi_command == 2) {
-      while (Serial.available()) {
-        String rapiString = Serial.readStringUntil('\r');
-        if (rapiString.startsWith("$OK ")) {
-          comm_success++;
-          String qrapi = rapiString.substring(rapiString.indexOf(' '));
-          state = strtol(qrapi.c_str(), NULL, 16);
-          if (state == 1) {
-            estate = "Not_Connected";
-          }
-          if (state == 2) {
-            estate = "EV_Connected";
-          }
-          if (state == 3) {
-            estate = "Charging";
-          }
-          if (state == 4) {
-            estate = "Vent_Required";
-          }
-          if (state == 5) {
-            estate = "Diode_Check_Failed";
-          }
-          if (state == 6) {
-            estate = "GFCI_Fault";
-          }
-          if (state == 7) {
-            estate = "No_Earth_Ground";
-          }
-          if (state == 8) {
-            estate = "Stuck_Relay";
-          }
-          if (state == 9) {
-            estate = "GFCI_Self_Test_Failed";
-          }
-          if (state == 10) {
-            estate = "Over_Temperature";
-          }
-          if (state == 254) {
-            estate = "Sleeping";
-          }
-          if (state == 255) {
-            estate = "Disabled";
-          }
-        }
-      }
+      String state_s;
+      rapi_parse(state_s, unused, unused);
+      state = strtol(state_s.c_str(), NULL, 16);
+      if (state == 1)   estate = "Not_Connected";
+      if (state == 2)   estate = "EV_Connected";
+      if (state == 3)   estate = "Charging";
+      if (state == 4)   estate = "Vent_Required";
+      if (state == 5)   estate = "Diode_Check_Failed";
+      if (state == 6)   estate = "GFCI_Fault";
+      if (state == 7)   estate = "No_Earth_Ground";
+      if (state == 8)   estate = "Stuck_Relay";
+      if (state == 9)   estate = "GFCI_Self_Test_Failed";
+      if (state == 10)  estate = "Over_Temperature";
+      if (state == 254) estate = "Sleeping";
+      if (state == 255) estate = "Disabled";
     }
     if (rapi_command_sent == 0 && rapi_command == 3) {
-      Serial.println("$GG*B2");
+      rapi_send("$GG*B2");
     }
     if (rapi_command_sent == 1 && rapi_command == 3) {
-      while (Serial.available()) {
-        String rapiString = Serial.readStringUntil('\r');
-        if (rapiString.startsWith("$OK")) {
-          comm_success++;
-          amp = rapiString.substring(rapiString.indexOf(' '));
-          volt = rapiString.substring(rapiString.lastIndexOf(' '));
-        }
-      }
+      rapi_parse(amp, volt, unused);
     }
     if (rapi_command_sent == 0 && rapi_command == 4) {
-      Serial.println("$GP*BB");
+      rapi_send("$GP*BB");
     }
     if (rapi_command_sent == 1 && rapi_command == 4) {
-      while (Serial.available()) {
-        String rapiString = Serial.readStringUntil('\r');
-        if (rapiString.startsWith("$OK")) {
-          comm_success++;
-          temp1 = rapiString.substring(rapiString.indexOf(' '));
-          int firstRapiCmd = rapiString.indexOf(' ');
-          temp2 = rapiString.substring(rapiString.indexOf(' ', firstRapiCmd + 1));
-          temp3 = rapiString.substring(rapiString.lastIndexOf(' '));
-        }
-      }
+      rapi_parse(temp1, temp2, temp3);
     }
     if (rapi_command_sent == 0 && rapi_command == 5) {
-      Serial.println("$GU*C0");
+      rapi_send("$GU*C0");
     }
     if (rapi_command_sent == 1 && rapi_command == 5) {
-      while (Serial.available()) {
-        String rapiString = Serial.readStringUntil('\r');
-        if (rapiString.startsWith("$OK")) {
-          comm_success++;
-          int firstRapiCmd = rapiString.indexOf(' ');
-          int secondRapiCmd = rapiString.indexOf(' ', firstRapiCmd + 1);
-          wattsec = rapiString.substring(firstRapiCmd, secondRapiCmd);
-          watthour_total = rapiString.substring(secondRapiCmd);
-        }
-      }
+      rapi_parse(wattsec, watthour_total, unused);
     }
     if (rapi_command_sent == 0 && rapi_command == 6) {
-      Serial.println("$GF*B1");
+      rapi_send("$GF*B1");
     }
     if (rapi_command_sent == 1 && rapi_command == 6) {
-      while (Serial.available()) {
-        String rapiString = Serial.readStringUntil('\r');
-        if (rapiString.startsWith("$OK")) {
-          comm_success++;
-          int firstRapiCmd = rapiString.indexOf(' ');
-          int secondRapiCmd = rapiString.indexOf(' ', firstRapiCmd + 1);
-          int thirdRapiCmd = rapiString.indexOf(' ', secondRapiCmd + 1);
-          gfci_count = rapiString.substring(firstRapiCmd, secondRapiCmd);
-          nognd_count = rapiString.substring(secondRapiCmd, thirdRapiCmd);
-          stuck_count = rapiString.substring(thirdRapiCmd);
-        }
-      }
+      rapi_parse(gfci_count, nognd_count, stuck_count);
       rapi_command = 0;         //Last RAPI command
     }
     if (rapi_command_sent == 0) {
       rapi_command_sent = 1;
-      comm_sent++;
     } else {
       rapi_command++;
       rapi_command_sent = 0;
@@ -238,94 +214,45 @@ update_rapi_values() {
 
 void
 handleRapiRead() {
-  Serial.flush();
-  Serial.println("$GV*C1");
-  comm_sent++;
+  Serial.flush(); // Flush output buffer
+  rapi_send("$GV*C1");
   delay(commDelay);
-  while (Serial.available()) {
-    String rapiString = Serial.readStringUntil('\r');
-    if (rapiString.startsWith("$OK")) {
-      comm_success++;
-      int firstRapiCmd = rapiString.indexOf(' ');
-      int secondRapiCmd = rapiString.indexOf(' ', firstRapiCmd + 1);
-      firmware = rapiString.substring(firstRapiCmd, secondRapiCmd);
-      protocol = rapiString.substring(secondRapiCmd);
-    }
-  }
-  Serial.println("$GA*AC");
-  comm_sent++;
+  rapi_parse(firmware, protocol, unused);
+  rapi_send("$GA*AC");
   delay(commDelay);
-  while (Serial.available()) {
-    String rapiString = Serial.readStringUntil('\r');
-    if (rapiString.startsWith("$OK")) {
-      comm_success++;
-      int firstRapiCmd = rapiString.indexOf(' ');
-      int secondRapiCmd = rapiString.indexOf(' ', firstRapiCmd + 1);
-      current_scale = rapiString.substring(firstRapiCmd, secondRapiCmd);
-      current_offset = rapiString.substring(secondRapiCmd);
-    }
-  }
-  Serial.println("$GH");
-  comm_sent++;
+  rapi_parse(current_scale, current_offset, unused);
+  rapi_send("$GH");
   delay(commDelay);
-  while (Serial.available()) {
-    String rapiString = Serial.readStringUntil('\r');
-    if (rapiString.startsWith("$OK")) {
-      comm_success++;
-      int firstRapiCmd = rapiString.indexOf(' ');
-      kwh_limit = rapiString.substring(firstRapiCmd);
-    }
-  }
-  Serial.println("$G3");
-  comm_sent++;
+  rapi_parse(kwh_limit, unused, unused);
+  rapi_send("$G3");
   delay(commDelay);
-  while (Serial.available()) {
-    String rapiString = Serial.readStringUntil('\r');
-    if (rapiString.startsWith("$OK")) {
-      comm_success++;
-      int firstRapiCmd = rapiString.indexOf(' ');
-      time_limit = rapiString.substring(firstRapiCmd);
-    }
-  }
-  Serial.println("$GE*B0");
-  comm_sent++;
+  rapi_parse(time_limit, unused, unused);
+  rapi_send("$GE*B0");
   delay(commDelay);
-  while (Serial.available()) {
-    String rapiString = Serial.readStringUntil('\r');
-    if (rapiString.startsWith("$OK ")) {
-      comm_success++;
-      pilot = rapiString.substring(rapiString.indexOf(' '));
-      String flag = rapiString.substring(rapiString.lastIndexOf(' '));
-      long flags = strtol(flag.c_str(), NULL, 16);
-      service = bitRead(flags, 0) + 1;
-      diode_ck = bitRead(flags, 1);
-      vent_ck = bitRead(flags, 2);
-      ground_ck = bitRead(flags, 3);
-      stuck_relay = bitRead(flags, 4);
-      auto_service = bitRead(flags, 5);
-      auto_start = bitRead(flags, 6);
-      serial_dbg = bitRead(flags, 7);
-      rgb_lcd = bitRead(flags, 8);
-      gfci_test = bitRead(flags, 9);
-      temp_ck = bitRead(flags, 10);
-    }
-  }
-  Serial.println("$GC*AE");
-  comm_sent++;
+  String flag;
+  rapi_parse(pilot, flag, unused);
+  long flags = strtol(flag.c_str(), NULL, 16);
+  service = bitRead(flags, 0) + 1;
+  diode_ck = bitRead(flags, 1);
+  vent_ck = bitRead(flags, 2);
+  ground_ck = bitRead(flags, 3);
+  stuck_relay = bitRead(flags, 4);
+  auto_service = bitRead(flags, 5);
+  auto_start = bitRead(flags, 6);
+  serial_dbg = bitRead(flags, 7);
+  rgb_lcd = bitRead(flags, 8);
+  gfci_test = bitRead(flags, 9);
+  temp_ck = bitRead(flags, 10);
+
+  rapi_send("$GC*AE");
   delay(commDelay);
-  while (Serial.available()) {
-    String rapiString = Serial.readStringUntil('\r');
-    if (rapiString.startsWith("$OK")) {
-      comm_success++;
-      int firstRapiCmd = rapiString.indexOf(' ');
-      int secondRapiCmd = rapiString.indexOf(' ', firstRapiCmd + 1);
-      if (service == 1) {
-        current_l1min = rapiString.substring(firstRapiCmd, secondRapiCmd);
-        current_l1max = rapiString.substring(secondRapiCmd);
-      } else {
-        current_l2min = rapiString.substring(firstRapiCmd, secondRapiCmd);
-        current_l2max = rapiString.substring(secondRapiCmd);
-      }
-    }
+  String current_min, current_max;
+  rapi_parse(current_min, current_max, unused);
+  if (service == 1) {
+    current_l1min = current_min;
+    current_l1max = current_max;
+  } else {
+    current_l2min = current_min;
+    current_l2max = current_max;
   }
 }
