@@ -268,11 +268,12 @@ function OpenEvseViewModel() {
       fingerprint: self.config.emoncms_fingerprint()
     };
 
-    if (emoncms.server === "" || emoncms.node === "") {
-      alert("Please enter Emoncms server and node");
-    } else if (emoncms.apikey.length != 32) {
+    // Both empty is ok (disable it) but can't set just one
+    if ((emoncms.server === "") !== (emoncms.node === "")) {
+      alert("Please enter both Emoncms server and node");
+    } else if (emoncms.server !== "" && emoncms.apikey.length != 32) {
       alert("Please enter valid Emoncms apikey");
-    } else if (emoncms.fingerprint !== "" && emoncms.fingerprint.length != 59) {
+    } else if ((emoncms.fingerprint !== "") && (emoncms.fingerprint.length != 59)) {
       alert("Please enter valid SSL SHA-1 fingerprint");
     } else {
       self.saveEmonCmsFetching(true);
@@ -302,8 +303,9 @@ function OpenEvseViewModel() {
       grid_ie: self.config.mqtt_grid_ie()
     };
 
-    if (mqtt.server === "") {
-      alert("Please enter MQTT server");
+    // Both empty is ok (disable it) but can't set just one
+    if ((mqtt.server === "") !== (mqtt.topic === "")) {
+      alert("Please enter both MQTT server and topic");
     } else {
       self.saveMqttFetching(true);
       self.saveMqttSuccess(false);
